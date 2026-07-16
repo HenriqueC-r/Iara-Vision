@@ -1,6 +1,8 @@
 import cv2
 import os
 import mediapipe as mp
+import math
+
 
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -29,6 +31,8 @@ detector = vision.HandLandmarker.create_from_options(options)
 # Abre a câmera DroidCam
 camera = cv2.VideoCapture(0)
 
+pinca_ativa = False
+
 
 while True:
     sucesso, frame = camera.read()
@@ -56,6 +60,21 @@ while True:
     if resultado.hand_landmarks:
 
         for mao in resultado.hand_landmarks:
+
+            polegar = mao[4]
+            indicador = mao[8]
+
+            distancia = math.hypot(
+                polegar.x - indicador.x,
+                polegar.y - indicador.y
+            )
+
+            if distancia < 0.05:
+                if not pinca_ativa:
+                    print("PINÇA")
+                    pinca_ativa = True
+            else:
+                pinca_ativa = False
 
             # Desenha os pontos da mão
             for ponto in mao:
