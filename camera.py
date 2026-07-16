@@ -31,8 +31,12 @@ detector = vision.HandLandmarker.create_from_options(options)
 # Abre a câmera DroidCam
 camera = cv2.VideoCapture(0)
 
-pinca_ativa = False
+# Limiar de distância pra considerar "pinça fechada"
+LIMIAR_PINCA = 0.05
 
+# Tamanho do painel do menu (em pixels)
+MENU_LARGURA = 260
+MENU_ALTURA = 220
 
 while True:
     sucesso, frame = camera.read()
@@ -41,6 +45,8 @@ while True:
         print("Erro ao acessar câmera")
         break
 
+
+    altura_frame, largura_frame = frame.shape[:2]
 
     # Converte BGR -> RGB
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -69,18 +75,19 @@ while True:
                 polegar.y - indicador.y
             )
 
-            if distancia < 0.05:
-                if not pinca_ativa:
-                    print("PINÇA")
-                    pinca_ativa = True
-            else:
-                pinca_ativa = False
+            # Menu fica aberto ENQUANTO a pinça estiver fechada
+            # (sem toggle: solta a pinça e o menu some)
+            pinca_fechada = distancia < LIMIAR_PINCA
+
+            # Ponto de ancoragem do menu: o pulso (landmark 0)
+            ancora_x = int(((polegar.x + indicador.x) / 2) * largura_frame) 
+            ancora_y = int(((polegar.y + indicador.y) / 2) * altura_frame)
 
             # Desenha os pontos da mão
             for ponto in mao:
 
-                x = int(ponto.x * frame.shape[1])
-                y = int(ponto.y * frame.shape[0])
+                x = int(ponto.x * largura_frame)
+                y = int(ponto.y * altura_frame)
 
                 cv2.circle(
                     frame,
@@ -103,11 +110,11 @@ while True:
 
             for inicio, fim in conexoes:
 
-                x1 = int(mao[inicio].x * frame.shape[1])
-                y1 = int(mao[inicio].y * frame.shape[0])
+                x1 = int(mao[inicio].x * largura_frame)
+                y1 = int(mao[inicio].y * altura_frame)
 
-                x2 = int(mao[fim].x * frame.shape[1])
-                y2 = int(mao[fim].y * frame.shape[0])
+                x2 = int(mao[fim].x * largura_frame)
+                y2 = int(mao[fim].y * altura_frame)
 
                 cv2.line(
                     frame,
@@ -115,6 +122,74 @@ while True:
                     (x2, y2),
                     (255, 0, 0),
                     2
+                )
+
+            # Se a pinça estiver fechada, desenha o menu ancorado no pulso
+            if pinca_fechada:
+
+                # Posição do menu: acima e à direita do pulso
+                x1_menu = ancora_x + 20
+                y1_menu = ancora_y - MENU_ALTURA - 20
+                x2_menu = x1_menu + MENU_LARGURA
+                y2_menu = y1_menu + MENU_ALTURA
+
+                # Garante que o menu não saia da tela (clamp)
+                if x1_menu < 0:
+                    x1_menu = 0
+                    x2_menu = MENU_LARGURA
+                if x2_menu > largura_frame:
+                    x2_menu = largura_frame
+                    x1_menu = largura_frame - MENU_LARGURA
+                if y1_menu < 0:
+                    y1_menu = 0
+                    y2_menu = MENU_ALTURA
+                if y2_menu > altura_frame:
+                    y2_menu = altura_frame
+                    y1_menu = altura_frame - MENU_ALTURA
+
+                cv2.rectangle(
+                    frame,
+                    (x1_menu, y1_menu),
+                    (x2_menu, y2_menu),
+                    (40, 40, 40),
+                    -1
+                )
+
+                cv2.rectangle(
+                    frame,
+                    (x1_menu, y1_menu),
+                    (x2_menu, y2_menu),
+                    (0, 255, 255),
+                    2
+                )
+
+                cv2.putText(
+                    frame,
+                    "IARA Vision",
+                    (x1_menu + 20, y1_menu + 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (255, 255, 255),
+                    2
+                )
+
+                cv2.putText(
+                    frame,
+                    "Menu Principal",
+                    (x1_menu + 20, y1_menu + 80),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (200, 200, 200),
+                    2
+                )
+
+                # Linha conectando o pulso ao menu (efeito "puxado da mao")
+                cv2.line(
+                    frame,
+                    (ancora_x, ancora_y),
+                    (x1_menu, y2_menu),
+                    (0, 255, 255),
+                    1
                 )
 
 
